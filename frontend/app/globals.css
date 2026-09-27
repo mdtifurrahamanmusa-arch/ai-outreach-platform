@@ -1,0 +1,222 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+type Contact = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  segment: string;
+  notes: string;
+};
+
+type Campaign = {
+  id: string;
+  title: string;
+  product: string;
+  audience: string;
+  tone: string;
+  message: string;
+  contact_ids: string[];
+  created_at: string;
+};
+
+type DraftRequest = {
+  product: string;
+  audience: string;
+  tone: string;
+  goal: string;
+  language: string;
+  style: string;
+  offer: string;
+};
+
+export default function Home() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    segment: 'Lead',
+    notes: '',
+  });
+
+  const [draftForm, setDraftForm] = useState<DraftRequest>({
+    product: 'AI-powered outreach platform',
+    audience: 'small business owners in Bangladesh',
+    tone: 'professional and friendly',
+    goal: 'generate sales leads',
+    language: 'Bangla',
+    style: 'short and persuasive',
+    offer: 'free consultation for the first 10 clients',
+  });
+
+  const [campaignForm, setCampaignForm] = useState({
+    title: 'Launch outreach campaign',
+    product: 'AI outreach and communication platform',
+    audience: 'local business owners',
+    tone: 'friendly',
+    message: '',
+  });
+
+  const loadData = async () => {
+    const [contactsRes, campaignsRes] = await Promise.all([
+      fetch(`${API_URL}/contacts`),
+      fetch(`${API_URL}/campaigns`),
+    ]);
+
+    if (contactsRes.ok) setContacts(await contactsRes.json());
+    if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = await fetch(`${API_URL}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(contactForm),
+    });
+
+    if (res.ok) {
+      setContactForm({ name: '', email: '', phone: '', segment: 'Lead', notes: '' });
+      loadData();
+    }
+  };
+
+  const handleGenerateDraft = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch(`${API_URL}/ai/draft`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(draftForm),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      setDraft(data.message);
+      setCampaignForm((prev) => ({ ...prev, message: data.message }));
+    }
+    setLoading(false);
+  };
+
+  const handleCreateCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const contactIds = contacts.slice(0, 3).map((contact) => contact.id);
+
+    const res = await fetch(`${API_URL}/campaigns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...campaignForm,
+        contact_ids: contactIds,
+      }),
+    });
+
+    if (res.ok) {
+      setCampaignForm({ title: 'Launch outreach campaign', product: '', audience: '', tone: 'friendly', message: '' });
+      loadData();
+    }
+  };
+
+  return (
+    <main className="page-shell">
+      <section className="hero">
+        <div>
+          <p className="eyebrow">AI Outreach Platform</p>
+          <h1>Turn conversations into revenue</h1>
+          <p className="subtitle">
+            Build stronger customer relationships, create personalized messages, and launch outreach campaigns faster.
+          </p>
+        </div>
+      </section>
+
+      <div className="grid">
+        <section className="card">
+          <h2>Add Prospect</h2>
+          <form onSubmit={handleAddContact} className="stack">
+            <input value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} placeholder="Name" />
+            <input value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} placeholder="Email" />
+            <input value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} placeholder="Phone" />
+            <select value={contactForm.segment} onChange={(e) => setContactForm({ ...contactForm, segment: e.target.value })}>
+              <option value="Lead">Lead</option>
+              <option value="Client">Client</option>
+              <option value="Prospect">Prospect</option>
+            </select>
+            <textarea value={contactForm.notes} onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })} placeholder="Notes" rows={3} />
+            <button type="submit">Save Contact</button>
+          </form>
+        </section>
+
+        <section className="card">
+          <h2>AI Draft Generator</h2>
+          <form onSubmit={handleGenerateDraft} className="stack">
+            <input value={draftForm.product} onChange={(e) => setDraftForm({ ...draftForm, product: e.target.value })} placeholder="Product" />
+            <input value={draftForm.audience} onChange={(e) => setDraftForm({ ...draftForm, audience: e.target.value })} placeholder="Audience" />
+            <input value={draftForm.goal} onChange={(e) => setDraftForm({ ...draftForm, goal: e.target.value })} placeholder="Goal" />
+            <input value={draftForm.offer} onChange={(e) => setDraftForm({ ...draftForm, offer: e.target.value })} placeholder="Offer" />
+            <input value={draftForm.language} onChange={(e) => setDraftForm({ ...draftForm, language: e.target.value })} placeholder="Language" />
+            <button type="submit" disabled={loading}>{loading ? 'Generating...' : 'Generate Message'}</button>
+          </form>
+          {draft ? (
+            <div className="draft-box">
+              <strong>Draft:</strong>
+              <p>{draft}</p>
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      <section className="card full-width">
+        <h2>Campaign Builder</h2>
+        <form onSubmit={handleCreateCampaign} className="stack-inline">
+          <input value={campaignForm.title} onChange={(e) => setCampaignForm({ ...campaignForm, title: e.target.value })} placeholder="Campaign title" />
+          <input value={campaignForm.product} onChange={(e) => setCampaignForm({ ...campaignForm, product: e.target.value })} placeholder="Product" />
+          <input value={campaignForm.audience} onChange={(e) => setCampaignForm({ ...campaignForm, audience: e.target.value })} placeholder="Audience" />
+          <input value={campaignForm.tone} onChange={(e) => setCampaignForm({ ...campaignForm, tone: e.target.value })} placeholder="Tone" />
+          <textarea value={campaignForm.message} onChange={(e) => setCampaignForm({ ...campaignForm, message: e.target.value })} placeholder="Message" rows={4} />
+          <button type="submit">Create Campaign</button>
+        </form>
+      </section>
+
+      <div className="grid lower-grid">
+        <section className="card">
+          <h2>Contacts</h2>
+          <ul className="list">
+            {contacts.map((contact) => (
+              <li key={contact.id}>
+                <strong>{contact.name}</strong>
+                <span>{contact.email}</span>
+                <small>{contact.segment}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="card">
+          <h2>Campaigns</h2>
+          <ul className="list">
+            {campaigns.map((campaign) => (
+              <li key={campaign.id}>
+                <strong>{campaign.title}</strong>
+                <span>{campaign.audience}</span>
+                <small>{campaign.contact_ids.length} recipients</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </main>
+  );
+}
